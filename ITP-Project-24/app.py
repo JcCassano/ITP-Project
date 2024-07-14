@@ -6,13 +6,19 @@ import csv
 import re
 import pandas as pd
 from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from dotenv import load_dotenv
+import os
+import subprocess
+
+# Load environment variables from .env file
+load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
 
 # Load tokenizer and model
-tokenizer = AutoTokenizer.from_pretrained("cybersectony/phishing-email-detection-distilbert")
-model = AutoModelForSequenceClassification.from_pretrained("cybersectony/phishing-email-detection-distilbert")
+tokenizer = AutoTokenizer.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
+model = AutoModelForSequenceClassification.from_pretrained("distilbert-base-uncased-finetuned-sst-2-english")
 
 def clean_html(html_content):
     cleaned_text = re.sub(r'<[^>]*>', '', html_content)
@@ -73,8 +79,8 @@ def index():
 @app.route('/extract_emails', methods=['GET', 'POST'])
 def extract_emails():
     if request.method == 'POST':
-        email_user = request.form.get('email_user')
-        email_pass = request.form.get('email_pass')
+        email_user = os.getenv('OUTLOOK_EMAIL')
+        email_pass = os.getenv('OUTLOOK_PASSWORD')
         num_emails = int(request.form.get('num_emails', 10))
         save_emails_to_csv(email_user, email_pass, num_emails)
         flash('Emails extracted successfully!', 'success')
@@ -90,6 +96,25 @@ def classify_emails():
         flash('Emails classified successfully!', 'success')
         return redirect(url_for('index'))
     return render_template('classify.html')
+
+# Integrate scripts
+@app.route('/run_crawler')
+def run_crawler():
+    result = subprocess.run(['python', 'scripts/crawler.py'], capture_output=True, text=True)
+    flash(result.stdout, 'success')
+    return redirect(url_for('index'))
+
+@app.route('/run_cvedbscript')
+def run_cvedbscript():
+    result = subprocess.run(['python', 'scripts/CVEDBScript.py'], capture_output=True, text=True)
+    flash(result.stdout, 'success')
+    return redirect(url_for('index'))
+
+@app.route('/run_policyquery')
+def run_policyquery():
+    result = subprocess.run(['python', 'scripts/policyquerygpt4.py'], capture_output=True, text=True)
+    flash(result.stdout, 'success')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     app.run(debug=True)
