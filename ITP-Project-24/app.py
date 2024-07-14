@@ -116,5 +116,11 @@ def run_policyquery():
     flash(result.stdout, 'success')
     return redirect(url_for('index'))
 
+@app.route('/run_outlook')
+def run_outlook():
+    result = subprocess.run(['python', 'scripts/outlook.py'], capture_output=True, text=True)
+    flash(result.stdout, 'success')
+    return redirect(url_for('index'))
+
 if __name__ == '__main__':
     app.run(debug=True)
