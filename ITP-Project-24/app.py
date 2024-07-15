@@ -9,6 +9,8 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 from dotenv import load_dotenv
 import os
 import subprocess
+import win32com.client
+import pythoncom
 
 # Load environment variables from .env file
 load_dotenv()
@@ -25,37 +27,29 @@ def clean_html(html_content):
     cleaned_text = re.sub(r'\s+', ' ', cleaned_text)
     return cleaned_text.strip()
 
-def save_emails_to_csv(email_user, email_pass, num_emails=5):
-    # Connect to the Outlook email server
-    mail = imaplib.IMAP4_SSL("outlook.office365.com")
-    mail.login(email_user, email_pass)
-    mail.select("inbox")
+def save_emails_to_csv(num_emails=5, read_all=False):
+    pythoncom.CoInitialize()
 
-    # Search for all emails in the inbox
-    status, messages = mail.search(None, "ALL")
-    email_ids = messages[0].split()[:num_emails]
+    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+    inbox = outlook.GetDefaultFolder(6)  # "6" refers to the inbox
+    messages = inbox.Items
+    messages.Sort("[ReceivedTime]", True)  # Sort by received time, descending
+
+    email_count = messages.Count if read_all else min(num_emails, messages.Count)
 
     with open('emails.csv', 'w', newline='', encoding='utf-8') as csvfile:
         fieldnames = ['body']
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames, quoting=csv.QUOTE_MINIMAL)
         writer.writeheader()
 
-        for email_id in email_ids:
-            status, msg_data = mail.fetch(email_id, "(RFC822)")
-            msg = email.message_from_bytes(msg_data[0][1])
+        for i in range(email_count):
+            message = messages[i]
+            cleaned_body = clean_html(message.Body)
+            writer.writerow({
+                'body': cleaned_body
+            })
 
-            if msg.is_multipart():
-                for part in msg.walk():
-                    if part.get_content_type() == "text/plain":
-                        body = part.get_payload(decode=True).decode()
-                        cleaned_body = clean_html(body)
-                        writer.writerow({'body': cleaned_body})
-            else:
-                body = msg.get_payload(decode=True).decode()
-                cleaned_body = clean_html(body)
-                writer.writerow({'body': cleaned_body})
-
-    mail.logout()
+    print(f"Saved {email_count} emails to emails.csv")
 
 def classify_email_chunk(text):
     inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True)
@@ -79,10 +73,8 @@ def index():
 @app.route('/extract_emails', methods=['GET', 'POST'])
 def extract_emails():
     if request.method == 'POST':
-        email_user = os.getenv('OUTLOOK_EMAIL')
-        email_pass = os.getenv('OUTLOOK_PASSWORD')
         num_emails = int(request.form.get('num_emails', 10))
-        save_emails_to_csv(email_user, email_pass, num_emails)
+        save_emails_to_csv(num_emails, read_all=False)
         flash('Emails extracted successfully!', 'success')
         return redirect(url_for('index'))
     return render_template('extract.html')
