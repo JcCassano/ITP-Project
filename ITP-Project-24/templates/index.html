@@ -10,7 +10,7 @@
 </head>
 <body>
     <div class="container d-flex flex-column justify-content-center align-items-center vh-100">
-        <div class="box text-center">
+        <div class="form-container">
             <h1>Email Processor</h1>
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
@@ -26,14 +26,20 @@
                     </div>
                 {% endif %}
             {% endwith %}
-            <nav class="nav justify-content-center mt-4">
-                <a class="nav-link btn btn-primary btn-lg btn-rounded mx-2" href="{{ url_for('extract_emails') }}">Extract Emails</a>
-                <a class="nav-link btn btn-success btn-lg btn-rounded mx-2" href="{{ url_for('classify_emails') }}">Classify Emails</a>
-                <a class="nav-link btn btn-info btn-lg btn-rounded mx-2" href="{{ url_for('run_crawler') }}">Run Crawler</a>
-                <a class="nav-link btn btn-warning btn-lg btn-rounded mx-2" href="{{ url_for('run_cvedbscript') }}">Run CVEDB Script</a>
-                <a class="nav-link btn btn-danger btn-lg btn-rounded mx-2" href="{{ url_for('run_policyquery') }}">Run Policy Query</a>
-                <a class="nav-link btn btn-secondary btn-lg btn-rounded mx-2" href="{{ url_for('run_outlook') }}">Run Outlook</a>
-            </nav>
+            <form method="post" action="{{ url_for('run_selected_action') }}">
+                <div class="form-group">
+                    <label for="actionSelect">Select Action:</label>
+                    <select class="form-control" id="actionSelect" name="action">
+                        <option value="extract_emails">Extract Emails</option>
+                        <option value="classify_emails">Classify Emails</option>
+                        <option value="run_crawler">Run Crawler</option>
+                        <option value="run_cvedbscript">Run CVEDB Script</option>
+                        <option value="run_policyquery">Run Policy Query</option>
+                        <option value="run_outlook">Run Outlook</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg btn-rounded btn-block">Run</button>
+            </form>
         </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
