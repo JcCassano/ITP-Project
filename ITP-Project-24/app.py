@@ -81,13 +81,33 @@ def extract_emails():
 
 @app.route('/classify_emails', methods=['GET', 'POST'])
 def classify_emails():
+    classified_emails = []
     if request.method == 'POST':
         df = pd.read_csv("emails.csv")
         df['prediction'] = df['body'].apply(classify_email)
         df.to_csv("emails_with_predictions.csv", index=False)
+        classified_emails = df.to_dict(orient='records')
         flash('Emails classified successfully!', 'success')
+    return render_template('classify.html', classified_emails=classified_emails)
+
+@app.route('/run_selected_action', methods=['POST'])
+def run_selected_action():
+    action = request.form.get('action')
+    if action == 'extract_emails':
+        return redirect(url_for('extract_emails'))
+    elif action == 'classify_emails':
+        return redirect(url_for('classify_emails'))
+    elif action == 'run_crawler':
+        return run_crawler()
+    elif action == 'run_cvedbscript':
+        return run_cvedbscript()
+    elif action == 'run_policyquery':
+        return run_policyquery()
+    elif action == 'run_outlook':
+        return run_outlook()
+    else:
+        flash('Invalid action selected!', 'danger')
         return redirect(url_for('index'))
-    return render_template('classify.html')
 
 # Integrate scripts
 @app.route('/run_crawler')
