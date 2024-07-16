@@ -10,16 +10,33 @@
 </head>
 <body>
     <div class="container d-flex flex-column justify-content-center align-items-center vh-100">
-        <div class="box text-center">
+        <div class="box">
             <h1>Classify Emails</h1>
             <form method="post" class="mt-4">
                 <button type="submit" class="btn btn-success btn-lg btn-rounded btn-block">Classify</button>
             </form>
             <a href="{{ url_for('index') }}" class="btn btn-link mt-3">Back to Home</a>
+            <div class="mt-5">
+                <h2>Classified Emails</h2>
+                {% if classified_emails %}
+                    <ul class="list-group">
+                        {% for email in classified_emails %}
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                {{ email.body }}
+                                <span class="badge {{ 'badge-danger' if email.prediction == 1 else 'badge-success' }}">
+                                    {{ 'Phishing' if email.prediction == 1 else 'Normal' }}
+                                </span>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <p>No emails classified yet.</p>
+                {% endif %}
+            </div>
         </div>
     </div>
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrap/css/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
