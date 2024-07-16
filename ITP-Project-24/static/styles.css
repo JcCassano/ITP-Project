@@ -1,11 +1,18 @@
 body {
     font-family: 'Roboto', sans-serif;
     background-color: #f8f9fa;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
 }
 
 h1 {
     color: #333;
     font-weight: 700;
+    margin-bottom: 20px;
 }
 
 .form-group {
@@ -13,15 +20,17 @@ h1 {
 }
 
 .box {
-    background-color: #fff;
+    background-color: rgba(128, 128, 128, 0.8); /* Translucent grey background for the box */
     border-radius: 10px;
-    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     padding: 2rem;
-    width: 400px; /* Fixed width for consistency */
-    height: 600px; /* Fixed height for consistency */
+    width: 100%;
+    max-width: 600px; /* Increased max-width for a larger box */
     display: flex;
     flex-direction: column;
     justify-content: center;
+    align-items: center;
+    color: #333; /* Text color for contrast */
 }
 
 .btn-rounded {
@@ -57,4 +66,44 @@ footer p {
 
 .nav-link {
     margin: 10px;
+}
+
+.form-container {
+    width: 100%;
+    max-width: 600px; /* Increased max-width for a larger box */
+    margin: 0 auto;
+    padding: 2rem;
+    background: rgba(128, 128, 128, 0.8);
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    color: #333;
+    min-height: 300
+
+}
+
+.form-container form {
+    margin: 0;
+}
+
+.btn-link {
+    display: block;
+    margin-top: 20px;
+    color: #007bff; /* Blue text color for links */
+}
+
+.list-group-item {
+    background-color: rgba(255, 255, 255, 0.9);
+    border: none;
+    border-radius: 5px;
+    margin-bottom: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.badge-danger {
+    background-color: #dc3545;
+}
+
+.badge-success {
+    background-color: #28a745;
 }
