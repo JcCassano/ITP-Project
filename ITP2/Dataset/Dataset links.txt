@@ -1,0 +1,10 @@
+SMS:
+https://data.mendeley.com/datasets/f45bkkt8pr/1
+
+Email:
+https://zenodo.org/records/8339691
+
+gpt email dataset:
+https://github.com/ReDASers/IWSPA-2023-Adversarial-Synthetic-Dataset/tree/main
+
+https://github.com/ReDASers/IWSPA-2023-Adversarial-Synthetic-Dataset/blob/main/Synthetic/synthetic_phish.csv
