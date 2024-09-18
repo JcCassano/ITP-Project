@@ -22,7 +22,7 @@ def clean_text(text):
 
 
 # Load the CSV file
-file_path = '../Dataset/sms.csv'  # Replace with the actual path to your CSV
+file_path = '../Dataset/sms.csv'
 df = pd.read_csv(file_path)
 
 # Apply the cleaning function to the 'TEXT' column (Column B)
