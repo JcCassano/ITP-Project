@@ -8,3 +8,6 @@ gpt email dataset:
 https://github.com/ReDASers/IWSPA-2023-Adversarial-Synthetic-Dataset/tree/main
 
 https://github.com/ReDASers/IWSPA-2023-Adversarial-Synthetic-Dataset/blob/main/Synthetic/synthetic_phish.csv
+
+phishing_email.csv
+https://www.kaggle.com/code/dima806/phishing-email-detection-distilbert-huggingface/input
