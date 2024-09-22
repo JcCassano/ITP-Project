@@ -22,14 +22,14 @@ def clean_text(text):
 
 
 # Load the CSV file
-file_path = '../Dataset/sms.csv'
+file_path = '../../Dataset/sms.csv'
 df = pd.read_csv(file_path)
 
 # Apply the cleaning function to the 'TEXT' column (Column B)
 df['TEXT'] = df['TEXT'].apply(clean_text)
 
 # Save the cleaned data to a new CSV file
-output_file_path = '../Dataset/cleaned_sms.csv'
+output_file_path = '../../Dataset/cleaned_sms.csv'
 df.to_csv(output_file_path, index=False)
 
 print(f"Cleaned data saved to {output_file_path}")

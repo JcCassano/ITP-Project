@@ -38,7 +38,7 @@ def clean_body(text):
 
 
 # Load the Excel file
-file_path = '../Dataset/Compiled_email.xlsx'
+file_path = '../../Dataset/Compiled_email.xlsx'
 df = pd.read_excel(file_path, sheet_name='Sheet1')
 
 # Apply the cleaning functions
@@ -49,7 +49,7 @@ df['subject'] = df['subject'].apply(clean_subject)
 df['body'] = df['body'].apply(clean_body)
 
 # Save the cleaned data back to the Dataset folder
-output_file_path = '../Dataset/Cleaned_Compiled_email.xlsx'  # Output file path
+output_file_path = '../../Dataset/Cleaned_Compiled_email.xlsx'  # Output file path
 df.to_excel(output_file_path, index=False)
 
 print(f"Cleaned data saved to {output_file_path}")

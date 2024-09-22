@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # Load the dataset
-data = pd.read_csv('../Dataset/synthetic_phish.csv')
+data = pd.read_csv('../../Dataset/synthetic_phish.csv')
 
 # Display the first few rows
 print("First few rows of the dataset:")
