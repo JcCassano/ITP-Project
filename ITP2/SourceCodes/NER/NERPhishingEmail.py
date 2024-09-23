@@ -8,6 +8,9 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix
 )
+from sklearn.feature_extraction.text import TfidfVectorizer
+from scipy.sparse import hstack
+from scipy.sparse import csr_matrix
 import matplotlib.pyplot as plt
 import seaborn as sns
 
@@ -80,25 +83,35 @@ X = data[['PERSON', 'ORG', 'MONEY', 'DATE', 'GPE', 'CARDINAL', 'PERCENT', 'QUANT
           'email_length', 'num_exclamations', 'num_questions', 'num_uppercase', 'num_digits']]
 y = data['Email Type']
 
-# Split the dataset into training and testing sets (75% training, 25% testing)
+# Transform the email text using TF-IDF vectorization
+vectorizer = TfidfVectorizer(stop_words='english', max_df=0.9)
+tfidf_features = vectorizer.fit_transform(data['Email Text'])
+
+# Combine NER features and TF-IDF features
+ner_features = data[['PERSON', 'ORG', 'MONEY', 'DATE', 'GPE', 'CARDINAL', 'PERCENT', 'QUANTITY',
+                     'email_length', 'num_exclamations', 'num_questions', 'num_uppercase', 'num_digits']]
+
+# Convert NER features to a sparse matrix
+ner_features_sparse = csr_matrix(ner_features.values)
+
+# Combine the features
+X_combined = hstack([tfidf_features, ner_features_sparse])
+
+# Proceed with train-test split and model training
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.25, random_state=42, stratify=y
+    X_combined, y, test_size=0.25, random_state=42, stratify=y
 )
 
-# Initialize the Logistic Regression classifier
+# Initialize and train the Logistic Regression classifier
 classifier = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
-
-# Train the classifier
 classifier.fit(X_train, y_train)
 
-# Make predictions on the test set
+# Make predictions and evaluate
 y_pred = classifier.predict(X_test)
-
-# Evaluate the model
 accuracy = accuracy_score(y_test, y_pred)
 precision_phishing = precision_score(y_test, y_pred, pos_label=1, zero_division=0)
 
-print(f"\nAccuracy of the model: {accuracy:.4f}")
+print(f"\nAccuracy of the combined model: {accuracy:.4f}")
 print(f"Precision for detecting phishing emails (label=1): {precision_phishing:.4f}")
 
 # (Optional) Proceed with further evaluation and visualization
