@@ -72,7 +72,6 @@ recall = recall_score(y_test, y_pred)
 f1 = f1_score(y_test, y_pred)
 
 # 9. Print results
-print(f"Email Phishing Detection - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}")
 print(f"\nAccuracy of the model: {accuracy:.4f}")
 print(f"Precision for detecting phishing emails (label=1): {precision:.4f}")
 print(f"Recall for detecting phishing emails (label=1): {recall:.4f}")
