@@ -7,7 +7,7 @@ from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D
-from sklearn.metrics import accuracy_score, precision_score
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # 1. Load the phishing email dataset
 email_data = pd.read_csv('../../Dataset/Phishing_Email.csv')
@@ -68,6 +68,12 @@ y_pred = (model.predict(X_test_padded) > 0.5).astype(int)  # Convert probabiliti
 # 8. Calculate accuracy and precision
 accuracy = accuracy_score(y_test, y_pred)
 precision = precision_score(y_test, y_pred)
+recall = recall_score(y_test, y_pred)
+f1 = f1_score(y_test, y_pred)
 
 # 9. Print results
 print(f"Email Phishing Detection - Accuracy: {accuracy:.4f}, Precision: {precision:.4f}")
+print(f"\nAccuracy of the model: {accuracy:.4f}")
+print(f"Precision for detecting phishing emails (label=1): {precision:.4f}")
+print(f"Recall for detecting phishing emails (label=1): {recall:.4f}")
+print(f"F1-score for detecting phishing emails (label=1): {f1:.4f}")
