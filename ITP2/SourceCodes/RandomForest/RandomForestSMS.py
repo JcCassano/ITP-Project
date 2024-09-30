@@ -5,6 +5,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
+    recall_score,
+    f1_score,
     confusion_matrix,
     classification_report
 )
@@ -25,8 +27,15 @@ print(data.isnull().sum())
 # Fill missing values with empty strings (if any)
 data = data.fillna('')
 
-# Map labels: 'smishing' to 1, others ('ham', 'spam') to 0
-data['Label'] = data['LABEL'].apply(lambda x: 1 if x.lower() == 'smishing' else 0)
+# Map labels to integers
+label_mapping = {'ham': 0, 'spam': 1, 'smishing': 2}
+data['Label'] = data['LABEL'].str.lower().map(label_mapping)
+
+# Remove any rows with missing labels after mapping
+data = data.dropna(subset=['Label'])
+
+# Convert labels to integers
+data['Label'] = data['Label'].astype(int)
 
 # Verify label encoding
 print("\nLabel distribution:")
@@ -35,10 +44,6 @@ print(data['Label'].value_counts())
 # Define features and target variable
 X = data['TEXT']
 y = data['Label']
-
-# Optional: Include other attributes if desired
-# Uncomment the following lines to include 'URL', 'EMAIL', 'PHONE' as features
-# X = data[['TEXT', 'URL', 'EMAIL', 'PHONE']]
 
 # Split the dataset into training and testing sets (75% training, 25% testing)
 X_train, X_test, y_train, y_test = train_test_split(
@@ -65,24 +70,31 @@ y_pred = classifier.predict(X_test_tfidf)
 
 # Evaluate the model
 accuracy = accuracy_score(y_test, y_pred)
-precision_smishing = precision_score(y_test, y_pred, pos_label=1, zero_division=0)
+
+# Compute precision, recall, and F1-score for the smishing class (label=2)
+precision_smishing = precision_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+recall_smishing = recall_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+f1_smishing = f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
 
 print(f"\nAccuracy of the model: {accuracy:.4f}")
-print(f"Precision for detecting smishing messages (label=1): {precision_smishing:.4f}")
+print(f"Precision for detecting smishing messages (label=2): {precision_smishing:.4f}")
+print(f"Recall for detecting smishing messages (label=2): {recall_smishing:.4f}")
+print(f"F1-score for detecting smishing messages (label=2): {f1_smishing:.4f}")
 
 # # Classification Report
 # print("\nClassification Report:")
-# print(classification_report(y_test, y_pred, target_names=['Non-Smishing', 'Smishing']))
+# target_names = ['Ham', 'Spam', 'Smishing']
+# print(classification_report(y_test, y_pred, target_names=target_names))
 #
 # # Confusion Matrix
-# conf_matrix = confusion_matrix(y_test, y_pred)
 # print("\nConfusion Matrix:")
+# conf_matrix = confusion_matrix(y_test, y_pred)
 # print(conf_matrix)
 #
 # # Visualize the confusion matrix
+# plt.figure(figsize=(8, 6))
 # sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
-#             xticklabels=['Non-Smishing', 'Smishing'],
-#             yticklabels=['Non-Smishing', 'Smishing'])
+#             xticklabels=target_names, yticklabels=target_names)
 # plt.xlabel('Predicted')
 # plt.ylabel('Actual')
 # plt.title('Confusion Matrix')
