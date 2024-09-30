@@ -6,6 +6,7 @@ from sklearn.metrics import (
     accuracy_score,
     precision_score,
     recall_score,
+    f1_score,
     classification_report,
     confusion_matrix
 )
@@ -30,8 +31,12 @@ print(data.isnull().sum())
 # Fill missing values with empty strings
 data = data.fillna('')
 
-# Map labels: 'smishing' to 1, others ('ham', 'spam') to 0
-data['Label'] = data['LABEL'].apply(lambda x: 1 if x.lower() == 'smishing' else 0)
+# Map labels to integers
+label_mapping = {'ham': 0, 'spam': 1, 'smishing': 2}
+data['Label'] = data['LABEL'].str.lower().map(label_mapping)
+
+# Remove any rows with missing labels after mapping
+data = data.dropna(subset=['Label'])
 
 # Verify label encoding
 print("\nLabel distribution:")
@@ -41,15 +46,15 @@ print(data['Label'].value_counts())
 def extract_entities(text):
     doc = nlp(text)
     entities = {
-        'URL': 0,
-        'EMAIL': 0,
-        'PHONE': 0,
         'PERSON': 0,
         'ORG': 0,
         'MONEY': 0,
         'DATE': 0,
         'TIME': 0,
         'GPE': 0,
+        'URL': 0,
+        'EMAIL': 0,
+        'PHONE': 0,
     }
     for ent in doc.ents:
         if ent.label_ in entities:
@@ -75,7 +80,7 @@ X = data[['PERSON', 'ORG', 'MONEY', 'DATE', 'TIME', 'GPE',
           'message_length', 'num_exclamations', 'num_questions',
           'num_uppercase', 'num_digits']]
 
-y = data['Label']
+y = data['Label'].astype(int)
 
 # Split the dataset into training and testing sets (75% training, 25% testing)
 X_train, X_test, y_train, y_test = train_test_split(
@@ -83,7 +88,7 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # Initialize the Logistic Regression classifier
-classifier = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000)
+classifier = LogisticRegression(class_weight='balanced', random_state=42, max_iter=1000, multi_class='multinomial', solver='lbfgs')
 
 # Train the classifier
 classifier.fit(X_train, y_train)
@@ -93,16 +98,20 @@ y_pred = classifier.predict(X_test)
 
 # Evaluate the model
 accuracy = accuracy_score(y_test, y_pred)
-precision_smishing = precision_score(y_test, y_pred, pos_label=1, zero_division=0)
-recall_smishing = recall_score(y_test, y_pred, pos_label=1, zero_division=0)
+
+# Compute precision, recall, and F1-score for the smishing class (label=2)
+precision_smishing = precision_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+recall_smishing = recall_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+f1_smishing = f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
 
 print(f"\nAccuracy of the model: {accuracy:.4f}")
-print(f"Precision for detecting smishing messages (label=1): {precision_smishing:.4f}")
-print(f"Recall for detecting smishing messages (label=1): {recall_smishing:.4f}")
+print(f"Precision for detecting smishing messages (label=2): {precision_smishing:.4f}")
+print(f"Recall for detecting smishing messages (label=2): {recall_smishing:.4f}")
+print(f"F1-score for detecting smishing messages (label=2): {f1_smishing:.4f}")
 
 # # Classification Report
 # print("\nClassification Report:")
-# print(classification_report(y_test, y_pred, target_names=['Non-Smishing', 'Smishing']))
+# print(classification_report(y_test, y_pred, target_names=['Ham', 'Spam', 'Smishing']))
 #
 # # Confusion Matrix
 # conf_matrix = confusion_matrix(y_test, y_pred)
@@ -110,9 +119,10 @@ print(f"Recall for detecting smishing messages (label=1): {recall_smishing:.4f}"
 # print(conf_matrix)
 #
 # # Visualize the confusion matrix
+# plt.figure(figsize=(8, 6))
 # sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
-#             xticklabels=['Non-Smishing', 'Smishing'],
-#             yticklabels=['Non-Smishing', 'Smishing'])
+#             xticklabels=['Ham', 'Spam', 'Smishing'],
+#             yticklabels=['Ham', 'Spam', 'Smishing'])
 # plt.xlabel('Predicted')
 # plt.ylabel('Actual')
 # plt.title('Confusion Matrix')
@@ -120,20 +130,19 @@ print(f"Recall for detecting smishing messages (label=1): {recall_smishing:.4f}"
 #
 # # Feature Importance Analysis
 # feature_names = X.columns
-# coefficients = classifier.coef_[0]
-# importance_df = pd.DataFrame({
-#     'Feature': feature_names,
-#     'Coefficient': coefficients
-# }).sort_values(by='Coefficient', ascending=False)
+# coefficients = classifier.coef_
 #
-# # Display top features
-# print("\nTop Features Contributing to Smishing Detection:")
-# print(importance_df)
+# # Create a DataFrame for coefficients of each class
+# importance_df = pd.DataFrame(coefficients.transpose(), index=feature_names, columns=['Ham', 'Spam', 'Smishing'])
 #
-# # Plot feature importances
-# importance_df.plot.bar(x='Feature', y='Coefficient', figsize=(12,6))
-# plt.title('Feature Importance in Smishing Detection')
-# plt.xlabel('Features')
-# plt.ylabel('Coefficient')
+# # Display coefficients for the smishing class
+# print("\nFeature Coefficients for Smishing Class:")
+# print(importance_df['Smishing'].sort_values(ascending=False))
+#
+# # Plot feature importances for the smishing class
+# importance_df['Smishing'].sort_values(ascending=True).plot(kind='barh', figsize=(10, 6))
+# plt.title('Feature Importance for Smishing Detection')
+# plt.xlabel('Coefficient')
+# plt.ylabel('Features')
 # plt.tight_layout()
 # plt.show()
