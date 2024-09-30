@@ -16,8 +16,15 @@ data = pd.read_csv('../../Dataset/cleaned_sms.csv')
 # Fill missing values with empty strings
 data = data.fillna('')
 
-# Map labels: 'smishing' to 1, others ('ham', 'spam') to 0
-data['Label'] = data['LABEL'].apply(lambda x: 1 if x.lower() == 'smishing' else 0)
+# Map labels to integers
+label_mapping = {'ham': 0, 'spam': 1, 'smishing': 2}
+data['Label'] = data['LABEL'].str.lower().map(label_mapping)
+
+# Remove any rows with missing labels after mapping
+data = data.dropna(subset=['Label'])
+
+# Convert labels to integers
+data['Label'] = data['Label'].astype(int)
 
 # Verify label encoding
 print("\nLabel distribution:")
@@ -58,17 +65,17 @@ X_train_resampled, y_train_resampled = shuffle(X_train_resampled, y_train_resamp
 print("\nAfter oversampling:")
 print(pd.Series(y_train_resampled).value_counts())
 
-# Build the Bidirectional LSTM model
+# Build the Bidirectional LSTM model for multi-class classification
 model = tf.keras.models.Sequential([
     tf.keras.layers.Embedding(input_dim=len(tokenizer.word_index) + 1,
                               output_dim=128,
                               input_length=max_seq_length),
     tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64, dropout=0.2, recurrent_dropout=0.2)),
-    tf.keras.layers.Dense(1, activation='sigmoid')
+    tf.keras.layers.Dense(3, activation='softmax')  # 3 classes
 ])
 
 # Compile the model
-model.compile(loss='binary_crossentropy',
+model.compile(loss='sparse_categorical_crossentropy',
               optimizer='adam',
               metrics=['accuracy'])
 
@@ -106,15 +113,36 @@ plt.show()
 
 # Make predictions on the test set
 y_pred_prob = model.predict(X_test_padded)
-y_pred = (y_pred_prob >= 0.5).astype(int).reshape(-1)
+y_pred = np.argmax(y_pred_prob, axis=1)
 
 # Evaluate the model
 accuracy = accuracy_score(y_test, y_pred)
-precision_smishing = precision_score(y_test, y_pred, pos_label=1, zero_division=0)
-recall_smishing = recall_score(y_test, y_pred, pos_label=1, zero_division=0)
-f1_smishing = f1_score(y_test, y_pred, pos_label=1, zero_division=0)
+
+# Compute precision, recall, and F1-score for the smishing class (label=2)
+precision_smishing = precision_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+recall_smishing = recall_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+f1_smishing = f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
 
 print(f"\nAccuracy of the model: {accuracy:.4f}")
-print(f"Precision for detecting smishing messages (label=1): {precision_smishing:.4f}")
-print(f"Recall for detecting smishing messages (label=1): {recall_smishing:.4f}")
-print(f"F1-score for detecting smishing messages (label=1): {f1_smishing:.4f}")
+print(f"Precision for detecting smishing messages (label=2): {precision_smishing:.4f}")
+print(f"Recall for detecting smishing messages (label=2): {recall_smishing:.4f}")
+print(f"F1-score for detecting smishing messages (label=2): {f1_smishing:.4f}")
+
+# # Classification Report
+# labels = ['ham', 'spam', 'smishing']
+# print("\nClassification Report:")
+# print(classification_report(y_test, y_pred, target_names=labels))
+#
+# # Confusion Matrix
+# print("\nConfusion Matrix:")
+# conf_matrix = confusion_matrix(y_test, y_pred)
+# print(conf_matrix)
+#
+# # Visualize the confusion matrix
+# plt.figure(figsize=(8, 6))
+# sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
+#             xticklabels=labels, yticklabels=labels)
+# plt.xlabel('Predicted')
+# plt.ylabel('Actual')
+# plt.title('Confusion Matrix')
+# plt.show()
