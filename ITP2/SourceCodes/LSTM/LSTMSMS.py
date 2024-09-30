@@ -3,9 +3,9 @@ import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
-from tensorflow.keras.preprocessing.text import Tokenizer
-from tensorflow.keras.preprocessing.sequence import pad_sequences
-from tensorflow.keras.models import Sequential
+from keras_preprocessing.text import Tokenizer
+from keras_preprocessing.sequence import pad_sequences
+import keras
 from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
@@ -46,7 +46,7 @@ X_test_padded = pad_sequences(X_test_seq, maxlen=100)
 
 # 5. Build the LSTM model
 def build_lstm_model(input_length, vocab_size):
-    model = Sequential()  # Initialize a Sequential model
+    model = keras.Sequential()  # Initialize a Sequential model
     model.add(Embedding(input_dim=vocab_size, output_dim=100, input_length=input_length))  # Embedding layer
     model.add(SpatialDropout1D(0.2))  # Apply dropout for regularization
     model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))  # LSTM layer with dropout
