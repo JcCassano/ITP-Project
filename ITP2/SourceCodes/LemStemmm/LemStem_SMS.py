@@ -8,7 +8,8 @@ from nltk.tokenize import word_tokenize
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.neural_network import MLPClassifier
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from sklearn.metrics import (accuracy_score, precision_score, recall_score, f1_score,
+                             classification_report, confusion_matrix)
 
 # Download required NLTK data
 nltk.download('punkt')
@@ -37,7 +38,7 @@ def preprocess_text(text):
     return ' '.join(processed_tokens)
 
 # Load the CSV dataset (update the file path if needed)
-file_path = 'C:/Users/Admin/Desktop/ITP2/cleaned_sms.csv'
+file_path = '../../Dataset/cleaned_sms.csv'
 sms_df = pd.read_csv(file_path)
 
 # Print the columns to verify structure
@@ -53,19 +54,32 @@ sms_df['processed_text'] = sms_df['text'].apply(preprocess_text)
 # Normalize the 'LABEL' column to lowercase to avoid duplicates
 sms_df['LABEL'] = sms_df['LABEL'].str.lower()
 
-# Check the unique labels
-print("Unique labels in the dataset after normalization:", sms_df['LABEL'].unique())
+# Map labels to integers
+label_mapping = {'ham': 0, 'spam': 1, 'smishing': 2}
+sms_df['Label'] = sms_df['LABEL'].map(label_mapping)
+
+# Remove any rows with missing labels after mapping
+sms_df = sms_df.dropna(subset=['Label'])
+
+# Convert labels to integers
+sms_df['Label'] = sms_df['Label'].astype(int)
+
+# Verify label encoding
+print("\nLabel distribution:")
+print(sms_df['Label'].value_counts())
 
 # Split dataset into features (X) and labels (y)
 X = sms_df['processed_text']
-y = sms_df['LABEL']  # Assuming 'LABEL' is the column that contains spam/ham labels
+y = sms_df['Label']
 
 # Vectorize the text using TF-IDF
 vectorizer = TfidfVectorizer(max_features=3000)
 X_tfidf = vectorizer.fit_transform(X)
 
 # Split data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_tfidf, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(
+    X_tfidf, y, test_size=0.2, random_state=42, stratify=y
+)
 
 # Build a neural network model
 model = MLPClassifier(hidden_layer_sizes=(100,), max_iter=300, random_state=42)
@@ -76,24 +90,36 @@ model.fit(X_train, y_train)
 # Make predictions
 y_pred = model.predict(X_test)
 
-# Calculate accuracy
+# Calculate overall accuracy
 accuracy = accuracy_score(y_test, y_pred)
 
-# Print unique labels in the test set
-print("Unique labels in the test set:", np.unique(y_test))
+# Compute precision, recall, and F1-score for the smishing class (label=2)
+precision_smishing = precision_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+recall_smishing = recall_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
+f1_smishing = f1_score(y_test, y_pred, labels=[2], average='macro', zero_division=0)
 
-# Calculate precision, recall, and F1 score using weighted average for multiclass support
-precision = precision_score(y_test, y_pred, average='weighted')
-recall = recall_score(y_test, y_pred, average='weighted')
-f1 = f1_score(y_test, y_pred, average='weighted')
+print(f"\nAccuracy of the model: {accuracy * 100:.4f}%")
+print(f"Precision for detecting smishing messages (label=2): {precision_smishing:.4f}")
+print(f"Recall for detecting smishing messages (label=2): {recall_smishing:.4f}")
+print(f"F1-score for detecting smishing messages (label=2): {f1_smishing:.4f}")
 
-# Print the results
-print(f'Accuracy: {accuracy * 100:.4f}%')
-print(f'Precision: {precision:.4f}')
-print(f'Recall: {recall:.4f}')
-print(f'F1 Score: {f1:.4f}')
-
-# Show detailed classification report
-# Use the unique labels from your dataset for target_names
-unique_labels = np.unique(y_test)
-print("\nClassification Report:\n", classification_report(y_test, y_pred, target_names=unique_labels))
+# # Classification Report
+# target_names = ['ham', 'spam', 'smishing']
+# print("\nClassification Report:\n", classification_report(y_test, y_pred, target_names=target_names))
+#
+# # Confusion Matrix
+# print("\nConfusion Matrix:")
+# conf_matrix = confusion_matrix(y_test, y_pred)
+# print(conf_matrix)
+#
+# # Optional: Visualize the confusion matrix
+# import matplotlib.pyplot as plt
+# import seaborn as sns
+#
+# plt.figure(figsize=(8, 6))
+# sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues',
+#             xticklabels=target_names, yticklabels=target_names)
+# plt.xlabel('Predicted')
+# plt.ylabel('Actual')
+# plt.title('Confusion Matrix')
+# plt.show()

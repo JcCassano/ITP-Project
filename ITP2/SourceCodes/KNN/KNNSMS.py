@@ -40,7 +40,7 @@ X_train_texts, X_test_texts, y_train, y_test = train_test_split(
 vectorizer = TfidfVectorizer(
     stop_words='english',
     ngram_range=(1, 2),       # Include unigrams and bigrams
-    max_df=0.9,
+    max_df=0.9  ,
     max_features=10000        # Limit vocabulary size
 )
 
