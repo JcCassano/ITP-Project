@@ -177,7 +177,7 @@ plt.show()
 
 
 # ----------------------------------------------------------------------------------
-# 9. Cross-Validation for Robust Evaluation
+# 8. Cross-Validation for Robust Evaluation
 # ----------------------------------------------------------------------------------
 
 # Define Stratified K-Fold
