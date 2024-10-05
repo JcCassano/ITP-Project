@@ -1,14 +1,17 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
+import tf_keras
 from keras_preprocessing.text import Tokenizer
 from keras_preprocessing.sequence import pad_sequences
 from sklearn.model_selection import train_test_split
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+from tf_keras.callbacks import EarlyStopping
 from imblearn.over_sampling import RandomOverSampler
 from sklearn.utils import shuffle
 import matplotlib.pyplot as plt
 import seaborn as sns
+from sklearn.utils.class_weight import compute_class_weight
 
 # Load the dataset
 data = pd.read_csv('../../Dataset/Phishing_Email.csv')
@@ -43,7 +46,7 @@ X_train_sequences = tokenizer.texts_to_sequences(X_train_texts)
 X_test_sequences = tokenizer.texts_to_sequences(X_test_texts)
 
 # Set a fixed maximum sequence length
-max_seq_length = 1000  # Adjust based on your dataset and memory constraints
+max_seq_length = 1000  # Keep as in original code
 
 # Pad sequences
 X_train_padded = pad_sequences(X_train_sequences, maxlen=max_seq_length, padding='post', truncating='post')
@@ -53,42 +56,43 @@ X_test_padded = pad_sequences(X_test_sequences, maxlen=max_seq_length, padding='
 print("\nOriginal label distribution:")
 print(pd.Series(y_train).value_counts())
 
-# Apply RandomOverSampler to the training data
-ros = RandomOverSampler(random_state=42)
-X_train_resampled, y_train_resampled = ros.fit_resample(X_train_padded, y_train)
 
-# Shuffle the resampled data
-X_train_resampled, y_train_resampled = shuffle(X_train_resampled, y_train_resampled, random_state=42)
+class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
+class_weight_dict = dict(enumerate(class_weights))
 
-# Verify new label distribution
-print("\nAfter oversampling:")
-print(pd.Series(y_train_resampled).value_counts())
-
-# Build the Bidirectional LSTM model
+# Build the Bidirectional LSTM model with slight adjustments
 model = tf.keras.models.Sequential([
-    tf.keras.layers.Embedding(input_dim=max_words,  # Use max_words instead of len(tokenizer.word_index) + 1
+    tf.keras.layers.Embedding(input_dim=max_words,
                               output_dim=128,
                               input_length=max_seq_length),
-    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(64, dropout=0.2, recurrent_dropout=0.2)),
+    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, return_sequences=True)),
+    tf.keras.layers.GlobalMaxPool1D(),
+    tf.keras.layers.Dense(64, activation='relu'),
+    tf.keras.layers.Dropout(0.5),
     tf.keras.layers.Dense(1, activation='sigmoid')
 ])
 
-# Compile the model
+# Compile the model with a slightly lower learning rate
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
 model.compile(loss='binary_crossentropy',
-              optimizer='adam',
+              optimizer=optimizer,
               metrics=['accuracy'])
 
 # Print model summary
 model.summary()
 
-# Train the model
-batch_size = 32
-epochs = 10  # Increase epochs for better learning
 
-history = model.fit(X_train_resampled, y_train_resampled,
+early_stopping = EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
+
+batch_size = 32
+epochs = 10
+
+history = model.fit(X_train_padded, y_train,
                     batch_size=batch_size,
                     epochs=epochs,
-                    validation_data=(X_test_padded, y_test))
+                    validation_data=(X_test_padded, y_test),
+                    class_weight=class_weight_dict,
+                    callbacks=[early_stopping])
 
 # Plot training and validation accuracy
 plt.figure(figsize=(12, 6))
