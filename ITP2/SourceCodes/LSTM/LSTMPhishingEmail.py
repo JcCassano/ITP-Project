@@ -6,7 +6,8 @@ from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D
+from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D, Dropout
+from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # 1. Load the phishing email dataset
@@ -41,31 +42,63 @@ X_test_seq = tokenizer.texts_to_sequences(X_test)
 X_train_padded = pad_sequences(X_train_seq, maxlen=100)
 X_test_padded = pad_sequences(X_test_seq, maxlen=100)
 
-# 5. Build the LSTM model
-def build_lstm_model(input_length, vocab_size):
-    model = Sequential()  # Initialize a Sequential model
-    model.add(Embedding(input_dim=vocab_size, output_dim=100, input_length=input_length))  # Embedding layer
-    model.add(SpatialDropout1D(0.2))  # Apply dropout for regularization
-    model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))  # LSTM layer with dropout
-    model.add(Dense(1, activation='sigmoid'))  # Output layer with sigmoid activation for binary classification
+# Load Pretrained GloVe Embeddings (50-dimensional)
+embedding_index = {}
+glove_file = "../../SourceCodes/LSTM/glove.6B.50d.txt"  # Make sure this file exists in your system
+with open(glove_file, encoding="utf8") as f:
+    for line in f:
+        values = line.split()
+        word = values[0]
+        coef = np.asarray(values[1:], dtype='float32')
+        embedding_index[word] = coef
 
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])  # Compile the model
+# Prepare the embedding matrix
+vocab_size = len(tokenizer.word_index) + 1
+embedding_dim = 50
+embedding_matrix = np.zeros((vocab_size, embedding_dim))
+
+for word, i in tokenizer.word_index.items():
+    embedding_vector = embedding_index.get(word)
+    if embedding_vector is not None:
+        embedding_matrix[i] = embedding_vector
+
+# 5. Build the optimized LSTM model
+def build_lstm_model(input_length, vocab_size, embedding_matrix, embedding_dim):
+    model = Sequential()
+    model.add(Embedding(input_dim=vocab_size,
+                        output_dim=embedding_dim,
+                        weights=[embedding_matrix],
+                        input_length=input_length,
+                        trainable=True))  # Now trainable for fine-tuning
+
+    model.add(SpatialDropout1D(0.2))  # Dropout for regularization
+
+    # Single LSTM layer with more units
+    model.add(LSTM(256, dropout=0.3, recurrent_dropout=0.3))  # Increase LSTM units to 256
+
+    # Add Dense layers for more complexity
+    model.add(Dense(64, activation='relu'))  # Extra dense layer with 64 units
+    model.add(Dropout(0.3))  # Dropout for dense layer
+
+    # Output layer
+    model.add(Dense(1, activation='sigmoid'))
+
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
     return model
 
-# Define parameters for the LSTM model
-vocab_size = len(tokenizer.word_index) + 1  # Vocabulary size (number of unique tokens in the dataset)
-input_length = 100  # Length of input sequences (same as maxlen used in padding)
+# Build the LSTM model
+model = build_lstm_model(input_length=100, vocab_size=vocab_size, embedding_matrix=embedding_matrix, embedding_dim=embedding_dim)
 
-# Build the LSTM model for email phishing detection
-model = build_lstm_model(input_length, vocab_size)
+# 6. Train the model (with ReduceLROnPlateau and EarlyStopping)
+early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2, patience=2, min_lr=0.0001)
 
-# 6. Train the model
-model.fit(X_train_padded, y_train, epochs=5, batch_size=64, validation_split=0.1, verbose=1)
+model.fit(X_train_padded, y_train, epochs=15, batch_size=64, validation_split=0.1, verbose=1, callbacks=[early_stopping, reduce_lr])
 
 # 7. Predict on the test data
 y_pred = (model.predict(X_test_padded) > 0.5).astype(int)  # Convert probabilities to binary predictions
 
-# 8. Calculate accuracy and precision
+# 8. Calculate accuracy, precision, recall, and F1 score
 accuracy = accuracy_score(y_test, y_pred)
 precision = precision_score(y_test, y_pred)
 recall = recall_score(y_test, y_pred)
