@@ -1,23 +1,26 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-import pandas as pd
-import numpy as np
-import tensorflow as tf
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from tensorflow.keras.preprocessing.text import Tokenizer
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 import keras
-from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D, Dropout
-from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
+from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
 # 1. Load the SMS dataset
 sms_data = pd.read_csv('../../Dataset/cleaned_sms.csv')
 
+# Display the first few rows of the dataset to understand its structure
+print("Dataset Structure:\n", sms_data.head())
+
 # 2. Preprocess the data
+# Convert 'LABEL' to binary labels: 1 for 'Smishing', 0 for 'ham'
 sms_data['Label'] = sms_data['LABEL'].apply(lambda x: 1 if x.lower() == 'smishing' else 0)
+
+# Display the first few rows of the dataset to understand its structure
+#print("Dataset Structure:\n", sms_data.head())
 
 # Extract features and labels
 X_sms = sms_data['TEXT'].values  # Feature: SMS content
@@ -30,8 +33,8 @@ X_sms = [str(x) if pd.notna(x) else '' for x in X_sms]
 X_train, X_test, y_train, y_test = train_test_split(X_sms, y_sms, test_size=0.2, random_state=42)
 
 # 4. Tokenize and pad the SMS texts
-tokenizer = Tokenizer(num_words=5000, lower=True, oov_token='UNK')
-tokenizer.fit_on_texts(X_train)
+tokenizer = Tokenizer(num_words=5000, lower=True, oov_token='UNK')  # Tokenizer with a vocabulary size of 5000 words
+tokenizer.fit_on_texts(X_train)  # Learn the word index from the training SMS texts
 
 # Convert text to sequences of integers
 X_train_seq = tokenizer.texts_to_sequences(X_train)
@@ -41,50 +44,29 @@ X_test_seq = tokenizer.texts_to_sequences(X_test)
 X_train_padded = pad_sequences(X_train_seq, maxlen=100)
 X_test_padded = pad_sequences(X_test_seq, maxlen=100)
 
-
-# 5. Build the optimized LSTM model
+# 5. Build the LSTM model
 def build_lstm_model(input_length, vocab_size):
-    model = keras.Sequential()
+    model = keras.Sequential()  # Initialize a Sequential model
+    model.add(Embedding(input_dim=vocab_size, output_dim=100, input_length=input_length))  # Embedding layer
+    model.add(SpatialDropout1D(0.2))  # Apply dropout for regularization
+    model.add(LSTM(100, dropout=0.2, recurrent_dropout=0.2))  # LSTM layer with dropout
+    model.add(Dense(1, activation='sigmoid'))  # Output layer with sigmoid activation for binary classification
 
-    # Embedding layer (trainable)
-    model.add(Embedding(input_dim=vocab_size,
-                        output_dim=200,  # Larger embedding size for more expressive representations
-                        input_length=input_length,
-                        trainable=True))
-    model.add(SpatialDropout1D(0.2))
-
-    # Single LSTM layer with 384 units
-    model.add(LSTM(384, dropout=0.2, recurrent_dropout=0.2, return_sequences=False))  # More LSTM units
-
-    # Dense layer with Dropout
-    model.add(Dense(128, activation='relu'))  # Increased dense units to 128
-    model.add(Dropout(0.3))
-
-    # Output layer
-    model.add(Dense(1, activation='sigmoid'))
-
-    # Compile the model
-    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
-
+    model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])  # Compile the model
     return model
 
-
 # Define parameters for the LSTM model
-vocab_size = len(tokenizer.word_index) + 1  # Vocabulary size
-input_length = 100  # Length of input sequences
+vocab_size = len(tokenizer.word_index) + 1  # Vocabulary size (number of unique tokens in the dataset)
+input_length = 100  # Length of input sequences (same as maxlen used in padding)
 
-# Build the LSTM model
+# Build the LSTM model for SMS smishing detection
 model = build_lstm_model(input_length, vocab_size)
 
-# 6. Train the model with early stopping and learning rate reduction on plateau
-early_stopping = EarlyStopping(monitor='val_loss', patience=4, restore_best_weights=True)
-reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.3, patience=2, min_lr=0.00001)
-
-model.fit(X_train_padded, y_train, epochs=20, batch_size=128, validation_split=0.1, verbose=1,
-          callbacks=[early_stopping, reduce_lr])
+# 6. Train the model
+model.fit(X_train_padded, y_train, epochs=5, batch_size=64, validation_split=0.1, verbose=1)
 
 # 7. Predict on the test data
-y_pred = (model.predict(X_test_padded) > 0.5).astype(int)
+y_pred = (model.predict(X_test_padded) > 0.5).astype(int)  # Convert probabilities to binary predictions
 
 # 8. Calculate accuracy, precision, recall, and F1 score
 accuracy = accuracy_score(y_test, y_pred)
@@ -94,6 +76,6 @@ f1 = f1_score(y_test, y_pred)
 
 # 9. Print results
 print(f"\nAccuracy of the model: {accuracy:.4f}")
-print(f"Precision for detecting smishing (label=1): {precision:.4f}")
-print(f"Recall for detecting smishing (label=1): {recall:.4f}")
-print(f"F1-score for detecting smishing (label=1): {f1:.4f}")
+print(f"Precision for detecting phishing emails (label=1): {precision:.4f}")
+print(f"Recall for detecting phishing emails (label=1): {recall:.4f}")
+print(f"F1-score for detecting phishing emails (label=1): {f1:.4f}")
