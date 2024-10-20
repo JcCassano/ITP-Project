@@ -1,17 +1,23 @@
 import pandas as pd
 import numpy as np
 import tensorflow as tf
-import tf_keras
 from keras_preprocessing.text import Tokenizer
 from keras_preprocessing.sequence import pad_sequences
+import keras
+from tensorflow.keras.regularizers import l2
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
-from tf_keras.callbacks import EarlyStopping
-from imblearn.over_sampling import RandomOverSampler
-from sklearn.utils import shuffle
-import matplotlib.pyplot as plt
-import seaborn as sns
 from sklearn.utils.class_weight import compute_class_weight
+import matplotlib.pyplot as plt
+import re
+import nltk
+from nltk.corpus import stopwords
+from tensorflow.keras.layers import Embedding, Bidirectional, LSTM, Dense, Dropout, BatchNormalization
+from tensorflow.keras import Sequential
+
+# Download NLTK stopwords
+nltk.download('stopwords')
+stop_words = set(stopwords.words('english'))
 
 # Load the dataset
 data = pd.read_csv('../../Dataset/Phishing_Email.csv')
@@ -27,8 +33,26 @@ data['Email Type'] = data['Email Type'].map(label_mapping)
 print("\nLabel distribution:")
 print(data['Email Type'].value_counts())
 
+# Text Preprocessing Function
+def preprocess_text(text):
+    # Lowercase
+    text = text.lower()
+    # Remove URLs
+    text = re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    # Remove special characters and numbers
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+    # Remove stopwords
+    tokens = text.split()
+    filtered_tokens = [word for word in tokens if word not in stop_words]
+    # Join tokens back into a string
+    text = ' '.join(filtered_tokens)
+    return text
+
+# Apply preprocessing to the 'Email Text' column
+data['Cleaned Email Text'] = data['Email Text'].apply(preprocess_text)
+
 # Define features and target variable
-X = data['Email Text'].values
+X = data['Cleaned Email Text'].values
 y = data['Email Type'].values
 
 # Split the dataset into training and testing sets (80% training, 20% testing)
@@ -46,7 +70,7 @@ X_train_sequences = tokenizer.texts_to_sequences(X_train_texts)
 X_test_sequences = tokenizer.texts_to_sequences(X_test_texts)
 
 # Set a fixed maximum sequence length
-max_seq_length = 1000  # Keep as in original code
+max_seq_length = 500  # Reduced for faster computation and to focus on important parts
 
 # Pad sequences
 X_train_padded = pad_sequences(X_train_sequences, maxlen=max_seq_length, padding='post', truncating='post')
@@ -56,24 +80,33 @@ X_test_padded = pad_sequences(X_test_sequences, maxlen=max_seq_length, padding='
 print("\nOriginal label distribution:")
 print(pd.Series(y_train).value_counts())
 
-
+# Compute class weights
 class_weights = compute_class_weight(class_weight='balanced', classes=np.unique(y_train), y=y_train)
 class_weight_dict = dict(enumerate(class_weights))
 
-# Build the Bidirectional LSTM model with slight adjustments
-model = tf.keras.models.Sequential([
-    tf.keras.layers.Embedding(input_dim=max_words,
-                              output_dim=128,
-                              input_length=max_seq_length),
-    tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(128, return_sequences=True)),
-    tf.keras.layers.GlobalMaxPool1D(),
-    tf.keras.layers.Dense(64, activation='relu'),
-    tf.keras.layers.Dropout(0.5),
-    tf.keras.layers.Dense(1, activation='sigmoid')
+
+embedding_dim = 300  # Increased embedding dimensions
+
+model = Sequential([
+    Embedding(input_dim=max_words,
+              output_dim=embedding_dim,
+              input_length=max_seq_length,
+              trainable=True),  # Set trainable to True
+    Dropout(0.5),  # Add dropout to embedding layer
+    Bidirectional(LSTM(128, return_sequences=True)),
+    BatchNormalization(),  # Add batch normalization
+    Dropout(0.5),
+    Bidirectional(LSTM(64)),
+    BatchNormalization(),
+    Dropout(0.5),
+    Dense(64, activation='relu', kernel_regularizer=l2(0.01)),  # Add L2 regularization
+    BatchNormalization(),
+    Dropout(0.5),
+    Dense(1, activation='sigmoid')
 ])
 
-# Compile the model with a slightly lower learning rate
-optimizer = tf.keras.optimizers.Adam(learning_rate=0.0005)
+# Compile the model with a lower learning rate
+optimizer = tf.keras.optimizers.Adam(learning_rate=0.0001)  # Lowered learning rate
 model.compile(loss='binary_crossentropy',
               optimizer=optimizer,
               metrics=['accuracy'])
@@ -81,11 +114,10 @@ model.compile(loss='binary_crossentropy',
 # Print model summary
 model.summary()
 
-
-early_stopping = EarlyStopping(monitor='val_loss', patience=2, restore_best_weights=True)
+early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
 
 batch_size = 32
-epochs = 10
+epochs = 20  # Increased number of epochs
 
 history = model.fit(X_train_padded, y_train,
                     batch_size=batch_size,
@@ -94,25 +126,6 @@ history = model.fit(X_train_padded, y_train,
                     class_weight=class_weight_dict,
                     callbacks=[early_stopping])
 
-# Plot training and validation accuracy
-plt.figure(figsize=(12, 6))
-plt.plot(history.history['accuracy'], label='Training Accuracy')
-plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
-plt.title('Model Accuracy Over Epochs')
-plt.xlabel('Epoch')
-plt.ylabel('Accuracy')
-plt.legend()
-plt.show()
-
-# Plot training and validation loss
-plt.figure(figsize=(12, 6))
-plt.plot(history.history['loss'], label='Training Loss')
-plt.plot(history.history['val_loss'], label='Validation Loss')
-plt.title('Model Loss Over Epochs')
-plt.xlabel('Epoch')
-plt.ylabel('Loss')
-plt.legend()
-plt.show()
 
 # Make predictions on the test set
 y_pred_prob = model.predict(X_test_padded)
