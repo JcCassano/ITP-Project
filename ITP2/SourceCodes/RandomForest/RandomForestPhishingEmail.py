@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import re
-from sklearn.model_selection import train_test_split, GridSearchCV, StratifiedKFold, cross_val_score
+from sklearn.model_selection import train_test_split, RandomizedSearchCV, StratifiedKFold, cross_val_score
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -13,11 +13,14 @@ from sklearn.metrics import (
     confusion_matrix
 )
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, FunctionTransformer
 from imblearn.over_sampling import SMOTE
 from imblearn.pipeline import Pipeline as ImbPipeline
 import matplotlib.pyplot as plt
 import seaborn as sns
 import warnings
+import string
 
 # Suppress warnings for cleaner output
 warnings.filterwarnings('ignore')
@@ -29,14 +32,6 @@ warnings.filterwarnings('ignore')
 # Load the dataset
 data = pd.read_csv('../../Dataset/Phishing_Email.csv')
 
-# Display the first few rows
-print("First few rows of the dataset:")
-print(data.head())
-
-# Check for missing values
-print("\nMissing values in each column:")
-print(data.isnull().sum())
-
 # Fill missing values with empty strings (if any)
 data = data.fillna('')
 
@@ -47,10 +42,6 @@ data = data.fillna('')
 # Encode the labels: Convert "Safe Email" to 0 and "Phishing Email" to 1
 label_mapping = {'Safe Email': 0, 'Phishing Email': 1}
 data['Label'] = data['Email Type'].map(label_mapping)
-
-# Verify label encoding
-print("\nLabel distribution:")
-print(data['Label'].value_counts())
 
 # ----------------------------------------------------------------------------------
 # 3. Feature Engineering
@@ -92,102 +83,116 @@ data['num_uppercase'] = data['Email Text'].apply(num_uppercase)
 data['num_digits'] = data['Email Text'].apply(num_digits)
 
 # ----------------------------------------------------------------------------------
-# 4. Train-Test Split
+# 4. Text Preprocessing Function
+# ----------------------------------------------------------------------------------
+
+def preprocess_text(text):
+    # Convert to lowercase
+    text = text.lower()
+    # Remove punctuation
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # Optionally, remove numbers
+    # text = re.sub(r'\d+', '', text)
+    return text
+
+data['Email Text'] = data['Email Text'].apply(preprocess_text)
+
+# ----------------------------------------------------------------------------------
+# 5. Train-Test Split
 # ----------------------------------------------------------------------------------
 
 # Define features and target variable
-X = data['Email Text']
+X = data.drop(['Email Type', 'Label'], axis=1)
 y = data['Label']
 
-# Optional: Include additional features by combining them with text
-additional_features = data[['has_url', 'has_email', 'has_phone', 'message_length',
-                           'num_exclamations', 'num_questions', 'num_uppercase', 'num_digits']]
-
 # Split the dataset into training and testing sets (75% training, 25% testing)
-X_train_text, X_test_text, y_train, y_test = train_test_split(
+X_train, X_test, y_train, y_test = train_test_split(
     X, y, test_size=0.25, random_state=42, stratify=y
 )
 
-X_train_additional = X_train_text.index.map(lambda idx: additional_features.loc[idx])
-X_test_additional = X_test_text.index.map(lambda idx: additional_features.loc[idx])
-
 # ----------------------------------------------------------------------------------
-# 5. Building the Pipeline
+# 6. Building the Pipeline
 # ----------------------------------------------------------------------------------
 
-# Initialize TF-IDF Vectorizer with optimized parameters
-tfidf = TfidfVectorizer(
-    stop_words='english',
-    max_df=0.9,
-    min_df=5,              # Remove very rare words
-    ngram_range=(1, 2),    # Include unigrams and bigrams
-    max_features=10000     # Limit to top 10,000 features
-)
+# Features to be processed
+text_features = 'Email Text'
+numeric_features = ['has_url', 'has_email', 'has_phone', 'message_length',
+                    'num_exclamations', 'num_questions', 'num_uppercase', 'num_digits']
 
-# Initialize Random Forest Classifier with class_weight='balanced'
-rf = RandomForestClassifier(
-    random_state=42,
-    class_weight='balanced'
-)
-
-# Create a Pipeline with TF-IDF and Random Forest
-pipeline = Pipeline([
-    ('tfidf', tfidf),
-    ('rf', rf)
+# Text preprocessing and TF-IDF vectorization
+text_transformer = Pipeline(steps=[
+    ('tfidf', TfidfVectorizer(
+        stop_words='english',
+        max_df=0.9,
+        min_df=5,
+        ngram_range=(1, 2),
+        max_features=10000
+    ))
 ])
 
-# ----------------------------------------------------------------------------------
-# 6. Handling Class Imbalance with SMOTE
-# ----------------------------------------------------------------------------------
+# Numeric features scaling
+numeric_transformer = Pipeline(steps=[
+    ('scaler', StandardScaler())
+])
 
-# Initialize SMOTE
-smote = SMOTE(random_state=42)
+# Combine preprocessing steps
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('text', text_transformer, text_features),
+        ('num', numeric_transformer, numeric_features)
+    ]
+)
 
 # Create an imbalanced pipeline with SMOTE
-imb_pipeline = ImbPipeline([
-    ('tfidf', tfidf),
-    ('smote', smote),
-    ('rf', rf)
+pipeline = ImbPipeline([
+    ('preprocessor', preprocessor),
+    ('smote', SMOTE(random_state=42)),
+    ('rf', RandomForestClassifier(
+        random_state=42,
+        class_weight='balanced'
+    ))
 ])
 
 # ----------------------------------------------------------------------------------
-# 7. Hyperparameter Tuning with GridSearchCV
+# 7. Hyperparameter Tuning with RandomizedSearchCV
 # ----------------------------------------------------------------------------------
 
 # Define the parameter grid for Random Forest
-param_grid = {
+param_distributions = {
     'rf__n_estimators': [200, 300, 400],
     'rf__max_depth': [None, 10, 20, 30],
     'rf__max_features': ['sqrt', 'log2'],
     'rf__min_samples_split': [2, 5, 10]
 }
 
-# Initialize GridSearchCV
-grid_search = GridSearchCV(
-    estimator=imb_pipeline,
-    param_grid=param_grid,
-    cv=5,                     # 5-fold cross-validation
-    scoring='f1',             # Optimize for F1-score (binary)
+# Initialize RandomizedSearchCV
+random_search = RandomizedSearchCV(
+    estimator=pipeline,
+    param_distributions=param_distributions,
+    n_iter=10,                # Limit to 10 iterations for efficiency
+    cv=3,                     # 3-fold cross-validation for speed
+    scoring='accuracy',       # Optimize for accuracy
     n_jobs=-1,                # Use all available cores
-    verbose=2
+    verbose=2,
+    random_state=42
 )
 
-# Fit GridSearchCV to the training data
-print("\nStarting Grid Search for Hyperparameter Tuning...")
-grid_search.fit(X_train_text, y_train)
+# Fit RandomizedSearchCV to the training data
+print("\nStarting Randomized Search for Hyperparameter Tuning...")
+random_search.fit(X_train, y_train)
 
 # Best parameters
-print("\nBest parameters found: ", grid_search.best_params_)
+print("\nBest parameters found: ", random_search.best_params_)
 
 # ----------------------------------------------------------------------------------
 # 8. Training the Optimized Random Forest Model
 # ----------------------------------------------------------------------------------
 
-# Use the best estimator from GridSearchCV
-best_pipeline = grid_search.best_estimator_
+# Use the best estimator from RandomizedSearchCV
+best_pipeline = random_search.best_estimator_
 
 # Make predictions on the test set
-y_pred = best_pipeline.predict(X_test_text)
+y_pred = best_pipeline.predict(X_test)
 
 # ----------------------------------------------------------------------------------
 # 9. Model Evaluation
@@ -231,15 +236,14 @@ plt.ylabel('Actual')
 plt.title('Optimized Random Forest - Confusion Matrix')
 plt.show()
 
-
 # ----------------------------------------------------------------------------------
 # 10. Cross-Validation for Robust Evaluation
 # ----------------------------------------------------------------------------------
 
 # Define Stratified K-Fold
-skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+skf = StratifiedKFold(n_splits=3, shuffle=True, random_state=42)
 
 # Evaluate the optimized Random Forest using cross-validation
-cv_scores = cross_val_score(best_pipeline, X_train_text, y_train, cv=skf, scoring='f1', n_jobs=-1)
-print(f"\n[Cross-Validation] Random Forest F1 Scores: {cv_scores}")
-print(f"[Cross-Validation] Mean F1 Score: {cv_scores.mean():.4f}")
+cv_scores = cross_val_score(best_pipeline, X_train, y_train, cv=skf, scoring='accuracy', n_jobs=-1)
+print(f"\n[Cross-Validation] Random Forest Accuracy Scores: {cv_scores}")
+print(f"[Cross-Validation] Mean Accuracy Score: {cv_scores.mean():.4f}")
