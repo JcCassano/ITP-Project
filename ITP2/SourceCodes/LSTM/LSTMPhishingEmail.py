@@ -10,6 +10,20 @@ from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D, Dr
 from tensorflow.keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
+# Import nltk for lemmatization and stemming
+import nltk
+from nltk.stem import WordNetLemmatizer, PorterStemmer
+from nltk.tokenize import word_tokenize
+
+# Download required nltk datasets (only need to run once)
+nltk.download('punkt_tab')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+# Initialize Lemmatizer and Stemmer
+lemmatizer = WordNetLemmatizer()
+stemmer = PorterStemmer()
+
 # 1. Load the phishing email dataset
 email_data = pd.read_csv('../../Dataset/Phishing_Email.csv')
 
@@ -20,8 +34,24 @@ print("Dataset Structure:\n", email_data.head())
 # Convert 'Email Type' to binary labels: 1 for 'Phishing Email', 0 for 'Safe Email'
 email_data['Label'] = email_data['Email Type'].apply(lambda x: 1 if x == 'Phishing Email' else 0)
 
+
+# 3. Text Preprocessing: Lemmatization and Stemming
+def preprocess_text(text):
+    # Tokenize the text
+    words = word_tokenize(text)
+
+    # Lemmatize and Stem each word in the text
+    lemmatized_words = [lemmatizer.lemmatize(word.lower()) for word in words]
+    #stemmed_words = [stemmer.stem(word) for word in lemmatized_words]
+
+    # Join the processed words back into a single string
+    return ' '.join(lemmatized_words)
+
+# Apply the preprocessing to the 'Email Text' column
+email_data['Processed_Text'] = email_data['Email Text'].apply(lambda x: preprocess_text(str(x)))
+
 # Extract features and labels
-X_email = email_data['Email Text'].values  # Feature: Email content
+X_email = email_data['Processed_Text'].values  # Feature: Email content
 y_email = email_data['Label'].values  # Label: Phishing (1) or Safe (0)
 
 # Check for missing values and replace with an empty string if any

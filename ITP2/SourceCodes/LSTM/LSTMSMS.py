@@ -9,6 +9,41 @@ import keras
 from tensorflow.keras.layers import Embedding, LSTM, Dense, SpatialDropout1D
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
 
+# Import nltk for lemmatization and stemming
+import nltk
+from nltk.stem import WordNetLemmatizer, PorterStemmer
+from nltk.tokenize import word_tokenize
+import re
+
+# Download required nltk datasets (only need to run once)
+nltk.download('punkt_tab')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+# Initialize Lemmatizer and Stemmer
+lemmatizer = WordNetLemmatizer()
+stemmer = PorterStemmer()
+
+# Preprocessing function with lemmatization and stemming
+def preprocess_text(text):
+    # Remove any non-alphabetic characters
+    text = re.sub(r'[^a-zA-Z\s]', '', text)
+
+    # Tokenize the text
+    words = word_tokenize(text)
+
+    # Lemmatize the words
+    lemmatized_words = [lemmatizer.lemmatize(word.lower()) for word in words]
+
+    # Join the preprocessed words back into a single string
+    return ' '.join(lemmatized_words)
+
+    # Lemmatize and stem the words
+    #lemmatized_stemmed_words = [stemmer.stem(lemmatizer.lemmatize(word.lower())) for word in words]
+
+    # Join the preprocessed words back into a single string
+    #return ' '.join(lemmatized_stemmed_words)
+
 # 1. Load the SMS dataset
 sms_data = pd.read_csv('../../Dataset/cleaned_sms.csv')
 
@@ -19,11 +54,14 @@ print("Dataset Structure:\n", sms_data.head())
 # Convert 'LABEL' to binary labels: 1 for 'Smishing', 0 for 'ham'
 sms_data['Label'] = sms_data['LABEL'].apply(lambda x: 1 if x.lower() == 'smishing' else 0)
 
+# Apply the preprocessing to the 'TEXT' column
+sms_data['Processed_Text'] = sms_data['TEXT'].apply(lambda x: preprocess_text(str(x)))
+
 # Display the first few rows of the dataset to understand its structure
 #print("Dataset Structure:\n", sms_data.head())
 
 # Extract features and labels
-X_sms = sms_data['TEXT'].values  # Feature: SMS content
+X_sms = sms_data['Processed_Text'].values  # Feature: SMS content
 y_sms = sms_data['Label'].values  # Label: Smishing (1) or Ham (0)
 
 # Check for missing values and replace with an empty string if any
